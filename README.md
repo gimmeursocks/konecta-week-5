@@ -177,3 +177,81 @@ This command applies my daemonset, which ensures that one pod runs on every node
 - kube-proxy: Manages networking and load balancing for services
 - Container Runtime: The engine that actually runs the containers (Containerd)
 - Node OS: Linux/Windows providing system resources
+
+## Part 3
+
+### Q1
+```bash
+minikube start --nodes=2
+```
+By default, minikube only starts with one node, but when you explicitly mention to create 2 this makes it so the first node is the master node and control plane, then the second node is the worker node
+![](images/p3q1.png)
+
+### Q2
+```bash
+kubectl create namespace fe
+kubectl create namespace mongo-db
+kubectl create namespace mongo-express
+```
+Creates 3 namespaces to deploy our seperate applications in them
+![](images/p3q2.png)
+
+### Rest of the implementations are in ```/bonus``` directory
+
+#### Q3A
+```bash
+kubectl apply -f frontend-deployment.yaml
+kubectl apply -f frontend-service.yaml
+```
+These commands create a deployment and service of the frontend service in the fe namespace, with 2 replicas and an emptyDir volume to store the web content
+![](images/p3q3a.png)
+
+#### Q3B
+```bash
+kubectl apply -f mongodb-deployment.yaml
+kubectl apply -f mongodb-service.yaml
+kubectl apply -f mongodb-pv-pvc.yaml
+kubectl apply -f mongodb-secret.yaml
+```
+The deployment runs mongodb with credentials from secret, the pvc+pv provide storage for ```/data/db```, and the clusterIP service exposes mongodb internally on port 27017
+![](images/p3q3b.png)
+
+#### Q3C
+```bash
+kubectl apply -f mongo-express-deployment.yaml
+kubectl apply -f mongo-express-service.yaml
+kubectl apply -f mongo-express-config.yaml
+```
+The deployment runs the mongo-express pod, nodeport exposes mongo express UI externally on port 30081, and the configmap stores username, password and service address
+![](images/p3q3c-1.png)
+![](images/p3q3c-2.png)
+
+#### Q3D
+```bash
+kubectl apply -f mongo-db-networkpolicy.yaml
+```
+The networkpolicy restricts access to the mongodb pod so that only pods in the mongo-express namespace can connect. This improves security and only allows a subset of pods to access mongodb
+![](images/p3q3d.png)
+
+#### Q4A
+```bash
+kubectl taint nodes minikube-m02 db=NoSchedule:NoSchedule
+```
+This taint prevents any pod from scheduling on minikube-m02 unless it has a matching toleration
+![](images/p3q4a.png)
+
+#### Q4B
+Add these lines to spec.template.spec in ```mongodb-deployment.yaml```:
+```bash
+tolerations:
+    - key: "db"
+    operator: "Equal"
+    value: "NoSchedule"
+    effect: "NoSchedule"
+```
+then apply the changes:
+```bash
+kubectl apply -f mongodb-deployment.yaml
+```
+Modifying the mongodb deployment by adding a toleration for ```db=NoSchedule``` makes this mongodb pod specifically scheduled on the tainted node, other pods won't be scheduled here
+![](images/p3q4b.png)
